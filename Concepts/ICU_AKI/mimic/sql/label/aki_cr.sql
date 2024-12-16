@@ -100,8 +100,8 @@ aki_diagnosis AS (
         aki_48.aki_48hr_time,
         aki_7.aki_7day_time,
         CASE
-            WHEN aki_48.aki_48hr_time IS NOT NULL THEN 'AKI within 48hr'
-            WHEN aki_7.aki_7day_time IS NOT NULL THEN 'AKI within 7day'
+            WHEN aki_48.aki_48hr_time IS NOT NULL THEN 'AKI-Cr within 48hr'
+            WHEN aki_7.aki_7day_time IS NOT NULL THEN 'AKI-Cr within 7day'
             ELSE 'No AKI'
         END AS aki_status,
         CASE

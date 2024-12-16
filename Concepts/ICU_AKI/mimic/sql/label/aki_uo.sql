@@ -72,7 +72,7 @@ uo_aki AS (
         ROUND(CAST((ur.urineoutput_6hr / wa.avg_weight / ur.uo_tm_6hr) AS numeric), 4) AS uo_rt_6hr,
         CASE WHEN ur.uo_tm_6hr >= 6
             AND (ur.urineoutput_6hr / wa.avg_weight / ur.uo_tm_6hr) < 0.5 THEN
-            'AKI'
+            'AKI-UO'
         ELSE
             'No AKI'
         END AS aki_status,

@@ -40,7 +40,7 @@ FROM
     combined_aki cr)
     -- 最终结果：整合所有AKI信息并根据 RRT 状态调整 AKI 最终诊断
     SELECT DISTINCT
-        hadm_id, stay_id, rrt_in_icu, aki_status_cr, aki_status_uo, CASE WHEN rrt_in_icu = TRUE OR aki_status_cr = 'AKI within 48hr' OR aki_status_cr = 'AKI within 7day' OR aki_status_uo = 'AKI' THEN
+        hadm_id, stay_id, rrt_in_icu, aki_status_cr, aki_status_uo, CASE WHEN rrt_in_icu = TRUE OR aki_status_cr = 'AKI-Cr within 48hr' OR aki_status_cr = 'AKI-Cr within 7day' OR aki_status_uo = 'AKI-UO' THEN
             TRUE -- 如果符合肌酐、尿量或RRT标准，则认定为ICU获得性AKI
         ELSE
             FALSE -- 否则为没有AKI
@@ -49,5 +49,5 @@ FROM
         final_aki
 WHERE
     rrt_in_icu = TRUE OR -- 保留进ICU后接受RRT的患者
-    aki_status_cr IN ('AKI within 48hr', 'AKI within 7day') OR aki_status_uo = 'AKI';
+    aki_status_cr IN ('AKI-Cr within 48hr', 'AKI-Cr within 7day') OR aki_status_uo = 'AKI-UO'; -- 保留符合肌酐或尿量标准的患者
 
