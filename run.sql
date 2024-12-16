@@ -1,0 +1,17 @@
+-- -- KDIGO
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/kdigo_cr.sql'
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/kdigo_uo.sql'
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/kdigo_final.sql'
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/AKI.sql'
+-- -- SOFA
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/Chemistry.sql'
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/BG.sql'
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/VitalSign.sql'
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/SOFA.sql'
+-- -- Demographics
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/Weight.sql'
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/Height.sql'
+-- -- Cr
+-- \i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/Creatinine.sql'
+-- Final
+\i '/home/hwxu/Projects/Dataset/PKU/AMIA/Libs/Data/SQL/Concepts/main.sql'

@@ -1,0 +1,24 @@
+# OSX file 
+.DS_Store
+eICU/csv/*
+mimic/csv/*
+Research/Input/*
+*.out
+*.pt
+*.csv
+*.txt
+*.pyc
+*.log
+*.json
+*.pkl
+*.npy
+*.npz
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.zip
+*.swp
+*.swo
+*.swn
+*.pdf
