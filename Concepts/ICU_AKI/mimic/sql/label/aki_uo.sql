@@ -77,16 +77,31 @@ uo_aki AS (
             'No AKI'
         END AS aki_status,
         -- Record the earliest time point when AKI criteria are met
-        MIN(charttime) OVER (PARTITION BY ur.stay_id ORDER BY ur.charttime RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS aki_timepoint -- 假设AKI的发生是在连续6小时内尿量低于阈值的第一次发生时确定的
+        MIN(charttime) OVER (PARTITION BY ur.stay_id ORDER BY ur.charttime RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS aki_timepoint -- AKI的发生是在连续6小时内尿量低于阈值的第一次发生时确定
     FROM
         uo_stg2 ur
         LEFT JOIN weight_avg wa ON ur.stay_id = wa.stay_id
     WHERE
         ur.uo_tm_6hr >= 6
         AND (ur.urineoutput_6hr / wa.avg_weight / ur.uo_tm_6hr) < 0.5
+),
+-- 选择每位患者的最早AKI判断
+earliest_aki AS (
+    SELECT
+        subject_id,
+        stay_id,
+        aki_status,
+        aki_timepoint,
+        ROW_NUMBER() OVER (PARTITION BY stay_id ORDER BY aki_timepoint ASC) AS row_num
+    FROM
+        uo_aki
 )
 SELECT
-    *
+    subject_id,
+    stay_id,
+    aki_status,
+    aki_timepoint AS charttime
 FROM
-    uo_aki;
-
+    earliest_aki
+WHERE
+    row_num = 1;  -- 只保留每个患者的最早判断

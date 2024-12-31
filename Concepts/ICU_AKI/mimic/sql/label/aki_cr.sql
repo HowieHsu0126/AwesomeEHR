@@ -123,7 +123,7 @@ SELECT
     stay_id,
     baseline_time AS baseline_time,
     baseline_creat AS baseline_creat,
-    aki_timepoint,
+    aki_timepoint AS charttime,
     aki_status
 FROM (
     SELECT DISTINCT
