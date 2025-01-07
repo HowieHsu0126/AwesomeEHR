@@ -31,7 +31,7 @@ WITH cr AS (
         AND le.charttime <= ie.outtime
 ),
 cr_baseline AS (
-    -- 获取每个病人在 ICU 期间 7 天内的最低肌酐值作为基线肌酐值
+    -- 获取每个病人在 ICU 入院后的前 7 天内的最低肌酐值作为基线肌酐值
     SELECT
         hadm_id,
         stay_id,
@@ -45,7 +45,8 @@ cr_baseline AS (
             charttime,
             ROW_NUMBER() OVER (PARTITION BY hadm_id ORDER BY creat ASC) AS rn  -- 按照肌酐值升序排序
         FROM cr
-        WHERE charttime >= DATETIME_SUB(intime, INTERVAL '7' DAY)  -- 基线时间窗口为 ICU 入院前 7 天
+        WHERE charttime >= intime  -- 基线时间窗口为 ICU 入院后的第一个 7 天
+        AND charttime < intime + INTERVAL '7' DAY  -- 只考虑进入ICU后7天内的数据
     ) sub
     WHERE rn = 1  -- 选择最小肌酐值及其对应时间
 ),
@@ -75,20 +76,17 @@ aki_7day AS (
         cr1.stay_id,
         cr1.charttime AS start_time,
         cr1.creat AS start_creat,
-        cr2.charttime AS compare_time,
-        cr2.creat AS compare_creat,
-        (cr2.creat - cr1.creat) AS creat_diff,
-        cr2.charttime AS aki_7day_time
+        cr1.charttime AS compare_time,  -- 使用 cr1 的 charttime 进行比较
+        cr1.creat AS compare_creat,    -- 使用 cr1 的 creat 进行比较
+        (cr1.creat - rb.baseline_creat) AS creat_diff,
+        cr1.charttime AS aki_7day_time
     FROM cr cr1
-    JOIN cr cr2
-        ON cr1.subject_id = cr2.subject_id
-        AND cr1.hadm_id = cr2.hadm_id
-        AND cr2.charttime > cr1.charttime  -- 确保比较的是晚于当前时间点的肌酐值
-        AND cr2.charttime <= cr1.charttime + INTERVAL '7' DAY  -- 在 7 天内进行比较
     JOIN cr_baseline rb
         ON cr1.hadm_id = rb.hadm_id  -- 引入基线数据进行对比
         AND cr1.stay_id = rb.stay_id
-    WHERE cr2.creat >= 1.5 * rb.baseline_creat  -- 肌酐值超过基线的 1.5 倍时诊断为 AKI
+    WHERE cr1.creat >= 1.5 * rb.baseline_creat  -- 肌酐值超过基线的 1.5 倍时诊断为 AKI
+        AND cr1.charttime > rb.baseline_time  -- 确保比较是在基线时间之后
+        AND cr1.charttime <= rb.baseline_time + INTERVAL '7' DAY  -- 只在基线时间后的 7 天内比较
 ),
 aki_diagnosis AS (
     -- 确定 AKI 诊断的时间，48 小时或 7 天内升高超过阈值时诊断为 AKI
@@ -117,7 +115,7 @@ aki_diagnosis AS (
         AND rb.stay_id = aki_7.stay_id
 )
 
--- 使用 ROW_NUMBER() 确保每个病人只有一个最终诊断结果
+-- 使用 ROW_NUMBER() 确保每个病人只有一个最早的诊断结果
 SELECT
     hadm_id,
     stay_id,
@@ -133,8 +131,8 @@ FROM (
         baseline_creat AS baseline_creat,
         aki_timepoint,
         aki_status,
-        ROW_NUMBER() OVER (PARTITION BY hadm_id, stay_id ORDER BY aki_timepoint) AS rn
+        ROW_NUMBER() OVER (PARTITION BY hadm_id, stay_id, aki_status ORDER BY aki_timepoint) AS rn
     FROM aki_diagnosis
 ) sub
-WHERE rn = 1  -- 只选取最早的诊断结果
+WHERE rn = 1  -- 只选取每种诊断的最早结果
 ORDER BY hadm_id, stay_id;
