@@ -1,7 +1,8 @@
 -- 目的: 计算患者在ICU入住后7天内的最高肌酐值。
 -- 操作: 类似于48小时查询，但此次是在7天的时间范围内进行。最后还计算了最高肌酐值与患者出院时间的时间差。
-DROP VIEW IF EXISTS peakcreat7h_view;
-CREATE VIEW peakcreat7h_view AS
+
+DROP TABLE IF EXISTS peakcreat7h;
+CREATE TABLE peakcreat7h AS
 WITH peakcr AS (
   SELECT
     patientunitstayid,

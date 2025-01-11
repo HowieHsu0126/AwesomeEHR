@@ -1,8 +1,8 @@
--- 删除已存在的 patient_weight_view 表（如果存在）
-DROP VIEW IF EXISTS patient_weight_view;
+-- 删除已存在的 patient_weight 表（如果存在）
+DROP TABLE IF EXISTS patient_weight;
 
--- 创建新表 patient_weight_view
-CREATE VIEW patient_weight_view AS
+-- 创建新表 patient_weight
+CREATE TABLE patient_weight AS
 
 WITH htwt AS (
     SELECT

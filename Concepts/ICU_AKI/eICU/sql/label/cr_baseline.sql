@@ -1,10 +1,10 @@
--- 用于确定稳定的基线肌酐水平
--- 目的: 确定患者在进入ICU前3个月内至ICU入住时的稳定肌酐值。
--- 操作: 首先筛选出特定时间窗口内的肌酐实验室结果。然后计算这段时间内肌酐值的平均值，并选择最接近平均值的记录作为稳定值。
+-- 用于确定基线肌酐水平
+-- 目的: 确定患者进入ICU后的第一个七天内的最低肌酐值。
+-- 操作: 筛选出进入ICU后的第一个七天内的肌酐实验室结果，并选择该段时间内的最低值作为基线肌酐。
 
-DROP VIEW IF EXISTS baseline_creat_view;
+DROP TABLE IF EXISTS baseline_creat;
 
-CREATE VIEW baseline_creat_view AS
+CREATE TABLE baseline_creat AS
 WITH creatinine_measurements AS (
     SELECT 
         patientunitstayid,
@@ -13,29 +13,19 @@ WITH creatinine_measurements AS (
         ROW_NUMBER() OVER (PARTITION BY patientunitstayid ORDER BY labresultoffset ASC) AS row_num
     FROM eicu_crd.lab
     WHERE labname = 'creatinine'
-      AND labresultoffset BETWEEN -10080 AND 0  -- -10080 minutes = -7 days
+      AND labresultoffset BETWEEN 0 AND 10080  -- 0到10080分钟 = ICU入院后的7天
 ),
-average_creatinine AS (
+baseline_creatinine AS (
     SELECT
         patientunitstayid,
-        AVG(labresult) AS avg_creatinine
+        MIN(labresult) AS baseline_creatinine,  -- 选择第一个7天内的最低肌酐值
+        MIN(labresultoffset) AS baseline_creat_offset  -- 对应的时间偏移
     FROM creatinine_measurements
     GROUP BY patientunitstayid
-),
-closest_to_average AS (
-    SELECT 
-        cm.patientunitstayid,
-        cm.labresult AS stable_creatinine,
-        cm.labresultoffset AS stable_creat_offset,
-        ABS(cm.labresult - ac.avg_creatinine) AS diff
-    FROM creatinine_measurements cm
-    JOIN average_creatinine ac ON cm.patientunitstayid = ac.patientunitstayid
-    ORDER BY diff ASC, cm.labresultoffset DESC
 )
 SELECT
     patientunitstayid,
-    MIN(stable_creatinine) AS stable_creatinine,  -- 选择最接近平均值的肌酐值
-    MIN(stable_creat_offset) AS stable_creat_offset  -- 对应的时间偏移
-FROM closest_to_average
-GROUP BY patientunitstayid
+    baseline_creatinine,
+    baseline_creat_offset
+FROM baseline_creatinine
 ORDER BY patientunitstayid;
