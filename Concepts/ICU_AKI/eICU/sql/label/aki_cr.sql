@@ -1,12 +1,6 @@
--- 用于判断ICU获得性AKI
--- 目的: 根据KDIGO标准判断是否符合ICU获得性AKI的标准，支持基于7天和48小时内的肌酐判断
--- 操作:
--- 1. 选择肌酐时间在基线之后，且时间差不超过7天或48小时的肌酐记录。
--- 2. 判断肌酐值是否满足KDIGO标准，符合升高1.5倍或以上（基于7天）或者升高0.3 mg/dL以上（基于48小时）。
+DROP TABLE IF EXISTS aki_cr;
 
-DROP TABLE IF EXISTS aki_diagnosis;
-
-CREATE TABLE aki_diagnosis AS
+CREATE TABLE aki_cr AS
 WITH creatinine_measurements AS (
     SELECT
         patientunitstayid,
@@ -69,21 +63,36 @@ aki_criteria_48hrs AS (
     FROM
         creatinine_measurements cm
     JOIN baseline_creatinine bc ON cm.patientunitstayid = bc.patientunitstayid
+),
+earliest_aki_criteria AS (
+    SELECT
+        COALESCE(aki_criteria_7days.patientunitstayid, aki_criteria_48hrs.patientunitstayid) AS patientunitstayid,
+        MAX(aki_criteria_7days.is_aki_7days) AS aki_diagnosis_7days, -- 是否符合基于7天的AKI标准
+        MAX(aki_criteria_48hrs.is_aki_48hrs) AS aki_diagnosis_48hrs, -- 是否符合基于48小时的AKI标准
+        CASE WHEN MAX(aki_criteria_7days.is_aki_7days) = 1
+            OR MAX(aki_criteria_48hrs.is_aki_48hrs) = 1 THEN
+            1
+        ELSE
+            0
+        END AS final_aki_diagnosis, -- 最终AKI诊断（如果满足任一标准则为1）
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(aki_criteria_7days.patientunitstayid, aki_criteria_48hrs.patientunitstayid) ORDER BY COALESCE(aki_criteria_7days.labresultoffset, aki_criteria_48hrs.labresultoffset) ASC) AS row_num
+    FROM
+        aki_criteria_7days
+    FULL OUTER JOIN aki_criteria_48hrs
+        ON aki_criteria_7days.patientunitstayid = aki_criteria_48hrs.patientunitstayid
+    GROUP BY
+        COALESCE(aki_criteria_7days.patientunitstayid, aki_criteria_48hrs.patientunitstayid),
+        COALESCE(aki_criteria_7days.labresultoffset, aki_criteria_48hrs.labresultoffset)
 )
-SELECT
-    COALESCE(aki_criteria_7days.patientunitstayid, aki_criteria_48hrs.patientunitstayid) AS patientunitstayid,
-    MAX(aki_criteria_7days.is_aki_7days) AS aki_diagnosis_7days, -- 是否符合基于7天的AKI标准
-    MAX(aki_criteria_48hrs.is_aki_48hrs) AS aki_diagnosis_48hrs, -- 是否符合基于48小时的AKI标准
-    CASE WHEN MAX(aki_criteria_7days.is_aki_7days) = 1
-        OR MAX(aki_criteria_48hrs.is_aki_48hrs) = 1 THEN
-        1
-    ELSE
-        0
-    END AS final_aki_diagnosis -- 最终AKI诊断（如果满足任一标准则为1）
+SELECT DISTINCT
+    patientunitstayid,
+    aki_diagnosis_7days,
+    aki_diagnosis_48hrs,
+    final_aki_diagnosis
 FROM
-    aki_criteria_7days
-    FULL OUTER JOIN aki_criteria_48hrs ON aki_criteria_7days.patientunitstayid = aki_criteria_48hrs.patientunitstayid
-GROUP BY
-    COALESCE(aki_criteria_7days.patientunitstayid, aki_criteria_48hrs.patientunitstayid)
+    earliest_aki_criteria
+WHERE
+    final_aki_diagnosis = 1 -- 选择最终被判断为AKI的患者
+    AND row_num = 1 -- 选择每个患者的最早记录
 ORDER BY
-    COALESCE(aki_criteria_7days.patientunitstayid, aki_criteria_48hrs.patientunitstayid);
+    patientunitstayid;
