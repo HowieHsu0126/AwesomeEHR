@@ -22,7 +22,8 @@ WITH ranked_treatments AS (
         AND LOWER(treatmentstring) LIKE '%chronic%'
 )
 SELECT
-    patientunitstayid
+    patientunitstayid,
+    treatmentoffset
 FROM
     ranked_treatments
 WHERE
