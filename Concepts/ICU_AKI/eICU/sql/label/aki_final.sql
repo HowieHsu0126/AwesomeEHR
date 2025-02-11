@@ -1,17 +1,19 @@
+-- 删除已存在的表格以避免重复
 DROP TABLE IF EXISTS final_aki_status;
 
+-- 创建最终AKI状态表，专注于ICU获得性AKI病人
 CREATE TABLE final_aki_status AS
-SELECT
-    ac.patientunitstayid,
-    ac.final_aki_diagnosis AS aki_cr_diagnosis,
-    uo.aki_status AS aki_uo_status,
-    CASE WHEN rrt.patientunitstayid IS NOT NULL THEN 1 ELSE 0 END AS aki_rrt_status  -- 使用CASE表达式处理NULL判断
+SELECT DISTINCT
+    COALESCE(ac.patientunitstayid, uo.patientunitstayid, rrt.patientunitstayid) AS patientunitstayid,
+    MIN(CASE 
+        WHEN ac.final_aki_diagnosis = 1 THEN ac.earliest_aki_diagnosis_time
+        WHEN uo.aki_status = 'AKI' THEN uo.chartoffset
+        WHEN rrt.patientunitstayid IS NOT NULL THEN rrt.treatmentoffset -- 取RRT的最早治疗时间
+        ELSE NULL
+    END) AS earliest_aki_diagnosis_time
 FROM aki_cr ac
-LEFT JOIN aki_uo uo ON ac.patientunitstayid = uo.patientunitstayid
-LEFT JOIN aki_rrt rrt ON ac.patientunitstayid = rrt.patientunitstayid
-WHERE
-    (ac.final_aki_diagnosis = 1  -- 肌酐标准为AKI
-    OR uo.aki_status = 'AKI'  -- 尿量标准为AKI
-    OR rrt.patientunitstayid IS NOT NULL)  -- 透析治疗记录存在
-GROUP BY ac.patientunitstayid, ac.final_aki_diagnosis, uo.aki_status, rrt.patientunitstayid  -- 必须按这些字段分组
-ORDER BY ac.patientunitstayid;
+FULL OUTER JOIN aki_uo uo ON ac.patientunitstayid = uo.patientunitstayid
+FULL OUTER JOIN aki_rrt rrt ON COALESCE(ac.patientunitstayid, uo.patientunitstayid) = rrt.patientunitstayid
+WHERE (ac.final_aki_diagnosis = 1 OR uo.aki_status = 'AKI' OR rrt.patientunitstayid IS NOT NULL)
+GROUP BY COALESCE(ac.patientunitstayid, uo.patientunitstayid, rrt.patientunitstayid)
+ORDER BY patientunitstayid;
