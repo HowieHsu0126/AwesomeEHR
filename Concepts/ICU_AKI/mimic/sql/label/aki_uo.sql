@@ -1,7 +1,4 @@
--- 计算每个患者的平均体重：在weight_avg子查询中，我们计算了每个患者的平均体重。
--- 计算每小时每公斤体重的尿量：在uo_aki子查询中，我们计算了每小时每公斤体重的尿量。
--- 根据尿量来判断AKI状态：根据KDIGO标准，如果尿量少于0.5毫升/千克/小时持续6小时以上，则被认为是AKI。我们在uo_aki子查询中实现了这个逻辑。
--- 结合每个患者的尿量数据和AKI状态进行输出：最终输出包括每个患者的stay_id、时间戳、平均体重、6小时尿量、尿量输出时间、每小时每公斤体重的尿量以及AKI状态。
+-- 创建 DATETIME_DIFF 函数，用于处理日期的差异
 CREATE OR REPLACE FUNCTION DATETIME_DIFF(endtime timestamp(3), starttime timestamp(3), datepart text)
     RETURNS numeric
     AS $$
@@ -23,8 +20,10 @@ END;
 $$
 LANGUAGE PLPGSQL;
 
+-- 删除旧的结果表
 DROP TABLE IF EXISTS aki_uo;
 
+-- 创建新的结果表
 CREATE TABLE aki_uo AS
 WITH uo_stg1 AS (
     SELECT
@@ -39,7 +38,7 @@ WITH uo_stg1 AS (
         INNER JOIN mimiciv_derived.urine_output uo ON ie.stay_id = uo.stay_id
 ),
 weight_avg AS (
-    -- Calculate the average weight for each patient
+    -- 计算每个患者的平均体重
     SELECT
         stay_id,
         AVG(weight) AS avg_weight
@@ -61,7 +60,7 @@ uo_stg2 AS (
         uo_stg1
 ),
 uo_aki AS (
-    -- Determine AKI status based on KDIGO urine output criteria
+    -- 基于 KDIGO 标准判断 AKI 状态
     SELECT
         ur.subject_id,
         ur.stay_id,
@@ -76,8 +75,8 @@ uo_aki AS (
         ELSE
             'No AKI'
         END AS aki_status,
-        -- Record the earliest time point when AKI criteria are met
-        MIN(charttime) OVER (PARTITION BY ur.stay_id ORDER BY ur.charttime RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS aki_timepoint -- AKI的发生是在连续6小时内尿量低于阈值的第一次发生时确定
+        -- 记录 AKI 发生的最早时间点
+        MIN(charttime) OVER (PARTITION BY ur.stay_id ORDER BY ur.charttime RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS aki_timepoint
     FROM
         uo_stg2 ur
         LEFT JOIN weight_avg wa ON ur.stay_id = wa.stay_id
@@ -85,7 +84,7 @@ uo_aki AS (
         ur.uo_tm_6hr >= 6
         AND (ur.urineoutput_6hr / wa.avg_weight / ur.uo_tm_6hr) < 0.5
 ),
--- 选择每位患者的最早AKI判断
+-- 选择每位患者的最早 AKI 判断
 earliest_aki AS (
     SELECT
         subject_id,

@@ -33,12 +33,14 @@ WITH cr AS (
 cr_baseline AS (
     -- 获取每个病人在 ICU 入院后的前 7 天内的最低肌酐值作为基线肌酐值
     SELECT
+        subject_id,  -- 添加 subject_id
         hadm_id,
         stay_id,
         creat AS baseline_creat,
         charttime AS baseline_time
     FROM (
         SELECT
+            subject_id,  -- 添加 subject_id
             hadm_id,
             stay_id,
             creat,
@@ -53,6 +55,7 @@ cr_baseline AS (
 aki_48hr AS (
     -- 获取每个病人在 48 小时内肌酐升高超过 0.3 时诊断为 AKI
     SELECT
+        cr1.subject_id,  -- 添加 subject_id
         cr1.hadm_id,
         cr1.stay_id,
         cr1.charttime AS start_time,
@@ -72,6 +75,7 @@ aki_48hr AS (
 aki_7day AS (
     -- 获取每个病人在 7 天内肌酐值升高超过基线的 1.5 倍的时间点
     SELECT
+        cr1.subject_id,  -- 添加 subject_id
         cr1.hadm_id,
         cr1.stay_id,
         cr1.charttime AS start_time,
@@ -91,6 +95,7 @@ aki_7day AS (
 aki_diagnosis AS (
     -- 确定 AKI 诊断的时间，48 小时或 7 天内升高超过阈值时诊断为 AKI
     SELECT
+        rb.subject_id,  -- 添加 subject_id
         rb.hadm_id,
         rb.stay_id,
         rb.baseline_time,
@@ -119,6 +124,7 @@ aki_diagnosis AS (
 SELECT
     hadm_id,
     stay_id,
+    subject_id,  -- 使用 subject_id
     baseline_time AS baseline_time,
     baseline_creat AS baseline_creat,
     aki_timepoint AS charttime,
@@ -126,13 +132,14 @@ SELECT
 FROM (
     SELECT DISTINCT
         hadm_id,
-        stay_id,
+        stay_id,    
+        subject_id,  -- 使用 subject_id
         baseline_time AS baseline_time,
         baseline_creat AS baseline_creat,
         aki_timepoint,
         aki_status,
-        ROW_NUMBER() OVER (PARTITION BY hadm_id, stay_id, aki_status ORDER BY aki_timepoint) AS rn
+        ROW_NUMBER() OVER (PARTITION BY subject_id, aki_status ORDER BY aki_timepoint) AS rn  -- 按 subject_id 分组
     FROM aki_diagnosis
 ) sub
 WHERE rn = 1  -- 只选取每种诊断的最早结果
-ORDER BY hadm_id, stay_id;
+ORDER BY subject_id;  -- 按 subject_id 排序

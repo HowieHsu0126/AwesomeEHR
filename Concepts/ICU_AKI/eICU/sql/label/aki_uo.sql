@@ -1,13 +1,19 @@
+-- 删除旧的 UO 结果表
 DROP TABLE IF EXISTS aki_uo;
 
+-- 创建一个视图，以识别尿量低于标准的 AKI 患者
 CREATE TABLE aki_uo AS
 WITH weight_data AS (
     SELECT
-        patientunitstayid,
-        AVG(weight) AS avg_weight  -- 假设体重在短时间内不会有大变化，取平均值
+        p.patientunitstayid,
+        p.uniquepid,  -- 通过 eicu_crd.patient 表获取 uniquepid 唯一标识患者
+        AVG(w.weight) AS avg_weight  -- 假设体重在短时间内不会有大变化，取平均值
     FROM
-        patient_weight
-    GROUP BY patientunitstayid
+        patient_weight w
+    JOIN
+        eicu_crd.patient p ON w.patientunitstayid = p.patientunitstayid  -- 连接 patient 表获取 uniquepid
+    GROUP BY
+        p.patientunitstayid, p.uniquepid
 ), urine_output_per_hour AS (
     SELECT
         uo.patientunitstayid,
@@ -53,6 +59,7 @@ WITH weight_data AS (
 ), earliest_aki_record AS (
     SELECT
         uph.patientunitstayid,
+        p.uniquepid,  -- 使用 uniquepid 唯一标识患者，确保连接 patient 表
         uph.chartoffset,
         uph.urineoutput,
         uph.avg_weight,
@@ -63,11 +70,14 @@ WITH weight_data AS (
         urine_output_per_hour uph
     JOIN
         aki_status ak ON uph.patientunitstayid = ak.patientunitstayid
+    JOIN
+        eicu_crd.patient p ON uph.patientunitstayid = p.patientunitstayid  -- 连接 patient 表获取 uniquepid
     WHERE
         ak.aki_status = 'AKI'  -- 只筛选出AKI患者
 )
 
 SELECT
+    uniquepid,  -- 返回 uniquepid 作为患者唯一标识
     patientunitstayid,
     chartoffset,
     urineoutput,
@@ -78,5 +88,7 @@ FROM
     earliest_aki_record
 WHERE
     row_num = 1  -- 选择每个患者的最早记录
+    -- 过滤掉诊断时间为负的样本
+    AND chartoffset >= 0
 ORDER BY
-    patientunitstayid;
+    uniquepid;  -- 按照 uniquepid 排序
