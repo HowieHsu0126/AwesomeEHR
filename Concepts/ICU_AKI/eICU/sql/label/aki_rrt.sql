@@ -3,17 +3,22 @@ DROP TABLE IF EXISTS aki_rrt;
 
 -- 创建一个视图，以识别在ICU入住前就已接受替代性肾脏治疗的慢性AKI患者
 CREATE TABLE aki_rrt AS
-WITH ranked_treatments AS (
+WITH all_rrt_treatments AS (
     SELECT
         t.patientunitstayid,
-        p.uniquepid,  -- 通过 patient 表获取 uniquepid 唯一标识患者
+        p.uniquepid,
         t.treatmentstring,
         t.treatmentoffset,
+        -- 标记是否为慢性/预先存在的RRT
+        CASE WHEN LOWER(t.treatmentstring) LIKE '%chronic%' 
+             OR LOWER(t.treatmentstring) LIKE '%pre-existing%'
+             OR LOWER(t.treatmentstring) LIKE '%preexisting%'
+             THEN TRUE ELSE FALSE END AS is_pre_existing,
         ROW_NUMBER() OVER (PARTITION BY t.patientunitstayid ORDER BY t.treatmentoffset ASC) AS row_num
     FROM
         eicu_crd.treatment t
     JOIN
-        eicu_crd.patient p ON t.patientunitstayid = p.patientunitstayid  -- 连接 patient 表获取 uniquepid
+        eicu_crd.patient p ON t.patientunitstayid = p.patientunitstayid
     WHERE
         (LOWER(t.treatmentstring) LIKE '%rrt%'
         OR LOWER(t.treatmentstring) LIKE '%dialysis%'
@@ -21,17 +26,16 @@ WITH ranked_treatments AS (
         OR LOWER(t.treatmentstring) LIKE '%cavhd%'
         OR LOWER(t.treatmentstring) LIKE '%cvvh%'
         OR LOWER(t.treatmentstring) LIKE '%sled%')
-        AND LOWER(t.treatmentstring) LIKE '%chronic%'  -- 只选择慢性AKI患者的记录
 )
 SELECT
-    uniquepid,  -- 返回 uniquepid 作为患者唯一标识
+    uniquepid,
     patientunitstayid,
-    treatmentoffset
+    treatmentoffset,
+    is_pre_existing
 FROM
-    ranked_treatments
+    all_rrt_treatments
 WHERE
-    row_num = 1  -- 只选择每个患者的最早记录
-    -- 过滤掉诊断时间为负的样本
+    row_num = 1
     AND treatmentoffset >= 0
 ORDER BY
     uniquepid, treatmentoffset;

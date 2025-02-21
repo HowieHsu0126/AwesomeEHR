@@ -16,7 +16,8 @@ WITH combined AS (
         -- 来自 aki_uo 表的判断
         CASE WHEN uo.aki_status = 'AKI' THEN TRUE ELSE FALSE END AS aki_uo,
         -- 来自 aki_rrt 表的判断：只要存在记录则为 True
-        CASE WHEN rrt.patientunitstayid IS NOT NULL THEN TRUE ELSE FALSE END AS aki_rrt
+        CASE WHEN rrt.patientunitstayid IS NOT NULL AND NOT rrt.is_pre_existing THEN TRUE ELSE FALSE END AS aki_rrt,
+        CASE WHEN rrt.is_pre_existing THEN TRUE ELSE FALSE END AS is_pre_existing_rrt
     FROM aki_cr ac
     FULL OUTER JOIN aki_uo uo
          ON ac.patientunitstayid = uo.patientunitstayid
@@ -39,6 +40,7 @@ earliest_aki_record AS (
         aki_cr_7d,
         aki_uo,
         aki_rrt,
+        is_pre_existing_rrt,
         ROW_NUMBER() OVER (PARTITION BY uniquepid ORDER BY LEAST(
             COALESCE(cr_offset, 99999999),
             COALESCE(uo_offset, 99999999),
@@ -52,6 +54,7 @@ earliest_aki_record AS (
 SELECT
     uniquepid,  -- 返回 uniquepid 作为患者唯一标识
     CASE 
+       WHEN bool_or(is_pre_existing_rrt) THEN NULL  -- 如果是 preICU-RRT 患者，则不计入 AKI
        WHEN MIN(LEAST(
           COALESCE(cr_offset, 99999999),
           COALESCE(uo_offset, 99999999),
@@ -67,12 +70,15 @@ SELECT
     bool_or(aki_rrt) AS aki_rrt,
     bool_or(aki_cr_48h) AS aki_cr_48h,
     bool_or(aki_cr_7d) AS aki_cr_7d,
-    bool_or(aki_uo) AS aki_uo
+    bool_or(aki_uo) AS aki_uo,
+    bool_or(is_pre_existing_rrt) AS is_pre_existing_rrt  -- 添加标记是否为 preICU-RRT 患者
 FROM
     earliest_aki_record
 WHERE
     row_num = 1  -- 选择每个患者的最早记录
 GROUP BY
     uniquepid  -- 按患者唯一标识符分组
+HAVING
+    NOT bool_or(is_pre_existing_rrt)  -- 排除 preICU-RRT 患者
 ORDER BY
     uniquepid;  -- 按照 uniquepid 排序
