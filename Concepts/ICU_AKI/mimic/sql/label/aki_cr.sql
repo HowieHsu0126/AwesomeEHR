@@ -120,26 +120,30 @@ aki_diagnosis AS (
         AND rb.stay_id = aki_7.stay_id
 )
 
--- 使用 ROW_NUMBER() 确保每个病人只有一个最早的诊断结果
+-- 修改最后的查询部分
 SELECT
     hadm_id,
     stay_id,
-    subject_id,  -- 使用 subject_id
-    baseline_time AS baseline_time,
-    baseline_creat AS baseline_creat,
+    subject_id,
+    baseline_time,
+    baseline_creat,
     aki_timepoint AS charttime,
     aki_status
 FROM (
     SELECT DISTINCT
         hadm_id,
         stay_id,    
-        subject_id,  -- 使用 subject_id
-        baseline_time AS baseline_time,
-        baseline_creat AS baseline_creat,
+        subject_id,
+        baseline_time,
+        baseline_creat,
         aki_timepoint,
         aki_status,
-        ROW_NUMBER() OVER (PARTITION BY subject_id, aki_status ORDER BY aki_timepoint) AS rn  -- 按 subject_id 分组
+        ROW_NUMBER() OVER (
+            PARTITION BY subject_id  -- 改为只按 subject_id 分组
+            ORDER BY aki_timepoint   -- 按时间排序，获取最早的记录
+        ) AS rn
     FROM aki_diagnosis
+    WHERE aki_status != 'No AKI'    -- 只选择有 AKI 的记录
 ) sub
-WHERE rn = 1  -- 只选取每种诊断的最早结果
-ORDER BY subject_id;  -- 按 subject_id 排序
+WHERE rn = 1  -- 只选取每个病人最早的 AKI 记录
+ORDER BY subject_id;

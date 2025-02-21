@@ -91,7 +91,7 @@ earliest_aki AS (
         stay_id,
         aki_status,
         aki_timepoint,
-        ROW_NUMBER() OVER (PARTITION BY stay_id ORDER BY aki_timepoint ASC) AS row_num
+        ROW_NUMBER() OVER (PARTITION BY subject_id ORDER BY aki_timepoint ASC) AS row_num
     FROM
         uo_aki
 )
@@ -103,4 +103,5 @@ SELECT
 FROM
     earliest_aki
 WHERE
-    row_num = 1;  -- 只保留每个患者的最早判断
+    row_num = 1
+ORDER BY subject_id;
