@@ -26,6 +26,19 @@ WITH all_rrt_treatments AS (
         OR LOWER(t.treatmentstring) LIKE '%cavhd%'
         OR LOWER(t.treatmentstring) LIKE '%cvvh%'
         OR LOWER(t.treatmentstring) LIKE '%sled%')
+),
+earliest_rrt AS (
+    SELECT
+        uniquepid,
+        patientunitstayid,
+        treatmentoffset,
+        is_pre_existing,
+        ROW_NUMBER() OVER (PARTITION BY uniquepid ORDER BY treatmentoffset ASC) AS earliest_row
+    FROM
+        all_rrt_treatments
+    WHERE
+        row_num = 1
+        AND treatmentoffset >= 0
 )
 SELECT
     uniquepid,
@@ -33,9 +46,8 @@ SELECT
     treatmentoffset,
     is_pre_existing
 FROM
-    all_rrt_treatments
+    earliest_rrt
 WHERE
-    row_num = 1
-    AND treatmentoffset >= 0
+    earliest_row = 1
 ORDER BY
     uniquepid, treatmentoffset;
