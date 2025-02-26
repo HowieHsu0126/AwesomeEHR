@@ -44,3 +44,6 @@ SELECT
     is_pre_icu_rrt,
     is_icu_rrt
 FROM first_rrt;
+
+-- 主要内容：识别接受肾脏替代治疗(RRT)的患者，
+-- 区分ICU入院前已存在RRT和ICU期间新发RRT，记录首次RRT时间

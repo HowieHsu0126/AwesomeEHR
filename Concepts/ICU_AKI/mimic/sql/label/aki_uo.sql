@@ -105,3 +105,7 @@ FROM
 WHERE
     row_num = 1
 ORDER BY subject_id;
+
+-- 主要内容：基于KDIGO尿量标准判断AKI，
+-- 计算6小时内的尿量输出率（ml/kg/h），当低于0.5时判定为AKI，
+-- 记录每个患者最早的AKI发生时间

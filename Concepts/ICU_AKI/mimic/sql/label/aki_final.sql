@@ -59,3 +59,6 @@ WHERE NOT EXISTS (
     WHERE e.subject_id = p.subject_id
 )
 ORDER BY subject_id;
+
+-- 主要内容：整合肌酐值(Cr)、尿量(UO)和肾脏替代治疗(RRT)三个维度的AKI判断结果，
+-- 确定每个患者最早的AKI发生时间，并排除ICU入院前已存在RRT的患者
