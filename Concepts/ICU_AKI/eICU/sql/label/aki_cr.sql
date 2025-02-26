@@ -3,6 +3,9 @@ DROP TABLE IF EXISTS aki_cr;
 
 -- 创建新的 AKI 结果表
 CREATE TABLE aki_cr AS
+-- 主要内容：基于肌酐值变化判断AKI，包括两个标准：
+-- 1. 基线肌酐值上升1.5倍以上（7天内）
+-- 2. 肌酐值在48小时内上升≥0.3 mg/dL
 -- 结合肌酐检测数据来提取 AKI 患者
 WITH creatinine_measurements AS (
     SELECT

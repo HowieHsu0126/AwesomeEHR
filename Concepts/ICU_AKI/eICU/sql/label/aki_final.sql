@@ -82,3 +82,6 @@ HAVING
     NOT bool_or(is_pre_existing_rrt)  -- 排除 preICU-RRT 患者
 ORDER BY
     uniquepid;  -- 按照 uniquepid 排序
+
+-- 主要内容：综合肌酐值(cr)、尿量(uo)和肾脏替代治疗(rrt)三个指标，
+-- 确定患者的最终AKI状态，并记录最早的AKI诊断时间

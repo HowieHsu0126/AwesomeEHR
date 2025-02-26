@@ -54,3 +54,6 @@ SELECT
 FROM htwt_fixed
 WHERE height_fixed IS NOT NULL AND weight_fixed IS NOT NULL
 ORDER BY patientunitstayid, chartoffset;
+
+-- 主要内容：处理患者体重数据，包括数据清洗和异常值处理，
+-- 为尿量相关的AKI判断提供必要的体重信息

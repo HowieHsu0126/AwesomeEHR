@@ -12,3 +12,6 @@
 \i '/data/hwxu/Dataset/PKU/AwsomeEHR/Concepts/ICU_AKI/eICU/sql/label/aki_rrt.sql'
 -- Final Decision
 \i '/data/hwxu/Dataset/PKU/AwsomeEHR/Concepts/ICU_AKI/eICU/sql/label/aki_final.sql'
+
+-- 主要内容：主程序文件，按顺序执行所有AKI相关的SQL查询，
+-- 包括肌酐值、尿量和RRT三个维度的判断

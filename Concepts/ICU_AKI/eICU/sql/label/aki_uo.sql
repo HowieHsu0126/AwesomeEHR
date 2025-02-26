@@ -92,3 +92,5 @@ WHERE
     AND chartoffset >= 0
 ORDER BY
     uniquepid;  -- 按照 uniquepid 排序
+
+-- 主要内容：基于尿量判断AKI，标准为连续6小时尿量低于0.5ml/kg/h

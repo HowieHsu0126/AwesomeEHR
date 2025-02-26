@@ -173,3 +173,6 @@ where uo.cellpath_is_uo = 1
 and cellvaluenumeric is not null
 group by patientunitstayid, intakeoutputoffset
 order by patientunitstayid, intakeoutputoffset;
+
+-- 主要内容：处理患者的尿量数据，整合各种不同记录方式的尿量信息，
+-- 统一格式便于后续分析
