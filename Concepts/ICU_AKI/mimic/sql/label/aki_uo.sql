@@ -84,16 +84,22 @@ uo_aki AS (
         ur.uo_tm_6hr >= 6
         AND (ur.urineoutput_6hr / wa.avg_weight / ur.uo_tm_6hr) < 0.5
 ),
--- 选择每位患者的最早 AKI 判断
+-- 选择每位患者的最早 AKI 判断，并确保 AKI 发生在 ICU 期间
 earliest_aki AS (
     SELECT
-        subject_id,
-        stay_id,
-        aki_status,
-        aki_timepoint,
-        ROW_NUMBER() OVER (PARTITION BY subject_id ORDER BY aki_timepoint ASC) AS row_num
+        ua.subject_id,
+        ua.stay_id,
+        ua.aki_status,
+        ua.aki_timepoint,
+        icu.icu_intime,
+        icu.icu_outtime,
+        ROW_NUMBER() OVER (PARTITION BY ua.subject_id ORDER BY ua.aki_timepoint ASC) AS row_num
     FROM
-        uo_aki
+        uo_aki ua
+    LEFT JOIN mimiciv_zone_js.icustay_detail icu 
+        ON ua.subject_id = icu.subject_id 
+        AND ua.stay_id = icu.stay_id
+    WHERE ua.aki_timepoint BETWEEN icu.icu_intime AND icu.icu_outtime  -- 添加 ICU 时间约束
 )
 SELECT
     subject_id,
