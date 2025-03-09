@@ -7,27 +7,33 @@ WITH weight_data AS (
     SELECT
         p.patientunitstayid,
         p.uniquepid,  -- 通过 eicu_crd.patient 表获取 uniquepid 唯一标识患者
+        p.unitdischargeoffset,  -- 添加出院时间偏移量
         AVG(w.weight) AS avg_weight  -- 假设体重在短时间内不会有大变化，取平均值
     FROM
         patient_weight w
     JOIN
         eicu_crd.patient p ON w.patientunitstayid = p.patientunitstayid  -- 连接 patient 表获取 uniquepid
     GROUP BY
-        p.patientunitstayid, p.uniquepid
+        p.patientunitstayid, p.uniquepid, p.unitdischargeoffset
 ), urine_output_per_hour AS (
     SELECT
         uo.patientunitstayid,
         uo.chartoffset,
         uo.urineoutput,
         wd.avg_weight,
+        wd.unitdischargeoffset,  -- 添加出院时间偏移量
         (uo.urineoutput / (6 * wd.avg_weight)) AS urine_output_ml_per_kg_per_hr  -- 计算每小时每公斤体重的尿量
     FROM
         pivoted_uo uo
     INNER JOIN weight_data wd ON uo.patientunitstayid = wd.patientunitstayid
+    WHERE 
+        uo.chartoffset >= 0  -- 确保时间在入ICU之后
+        AND uo.chartoffset <= wd.unitdischargeoffset  -- 确保时间在出ICU之前
 ), aki_criteria AS (
     SELECT
         uph.patientunitstayid,
         uph.chartoffset,
+        uph.unitdischargeoffset,  -- 传递出院时间偏移量
         uph.urine_output_ml_per_kg_per_hr,
         CASE
             WHEN uph.urine_output_ml_per_kg_per_hr < 0.5 THEN 1  -- 如果尿量小于0.5毫升/千克/小时
@@ -39,6 +45,7 @@ WITH weight_data AS (
     SELECT
         patientunitstayid,
         chartoffset,
+        unitdischargeoffset,  -- 传递出院时间偏移量
         is_aki,
         ROW_NUMBER() OVER (PARTITION BY patientunitstayid ORDER BY chartoffset) AS rn
     FROM
@@ -47,15 +54,16 @@ WITH weight_data AS (
         is_aki = 1  -- 只考虑尿量低于标准的记录
 ), aki_status AS (
     SELECT
-        patientunitstayid,
+        ca.patientunitstayid,
+        MAX(ca.unitdischargeoffset) as unitdischargeoffset,  -- 保留出院时间偏移量
         CASE
             WHEN COUNT(*) >= 6 THEN 'AKI'  -- 连续6小时尿量低于0.5毫升/千克/小时，视为AKI
             ELSE 'Non-AKI'
         END AS aki_status
     FROM
-        consecutive_aki
+        consecutive_aki ca
     GROUP BY
-        patientunitstayid
+        ca.patientunitstayid
 ), earliest_aki_record AS (
     SELECT
         uph.patientunitstayid,
@@ -65,6 +73,7 @@ WITH weight_data AS (
         uph.avg_weight,
         uph.urine_output_ml_per_kg_per_hr,
         ak.aki_status,
+        ak.unitdischargeoffset,  -- 传递出院时间偏移量
         ROW_NUMBER() OVER (PARTITION BY uph.patientunitstayid ORDER BY uph.chartoffset ASC) AS row_num  -- 每个患者的最早记录
     FROM
         urine_output_per_hour uph
@@ -88,8 +97,8 @@ FROM
     earliest_aki_record
 WHERE
     row_num = 1  -- 选择每个患者的最早记录
-    -- 过滤掉诊断时间为负的样本
-    AND chartoffset >= 0
+    AND chartoffset >= 0  -- 确保在入ICU后
+    AND chartoffset <= unitdischargeoffset  -- 确保在出ICU前
 ORDER BY
     uniquepid;  -- 按照 uniquepid 排序
 
