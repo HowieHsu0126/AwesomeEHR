@@ -23,22 +23,6 @@ WITH combined_aki AS (
         charttime as aki_timepoint
     FROM aki_uo
     WHERE aki_status = 'AKI-UO'
-    
-    UNION
-    
-    SELECT 
-        subject_id,
-        stay_id,
-        'RRT' as aki_method,
-        charttime as aki_timepoint
-    FROM icu_crrt
-    WHERE is_icu_rrt = TRUE
-),
--- 获取 preICU-RRT 患者列表
-pre_icu_rrt_patients AS (
-    SELECT DISTINCT subject_id
-    FROM icu_crrt
-    WHERE is_pre_icu_rrt = TRUE
 ),
 -- 选择每个患者最早的 AKI 发生时间
 earliest_aki AS (
@@ -48,16 +32,11 @@ earliest_aki AS (
     FROM combined_aki
     GROUP BY subject_id
 )
--- 最终输出：排除 preICU-RRT 患者
+-- 最终输出
 SELECT DISTINCT
     e.subject_id,
     e.aki_timepoint
 FROM earliest_aki e
-WHERE NOT EXISTS (
-    SELECT 1 
-    FROM pre_icu_rrt_patients p 
-    WHERE e.subject_id = p.subject_id
-)
 ORDER BY subject_id;
 
 -- 主要内容：整合肌酐值(Cr)、尿量(UO)和肾脏替代治疗(RRT)三个维度的AKI判断结果，
