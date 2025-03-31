@@ -1,12 +1,11 @@
 -- 如果表存在则删除
-DROP TABLE IF EXISTS eicu_crd.trauma_vital_signs;
+DROP TABLE IF EXISTS public.trauma_vital_signs;
 
 -- 创建生命体征表
-CREATE TABLE eicu_crd.trauma_vital_signs AS
+CREATE TABLE public.trauma_vital_signs AS
 WITH vital_signs AS (
     SELECT 
-        p.uniquepid,
-        n.patientunitstayid,
+        p.patientunitstayid,
         n.nursingchartoffset,
         -- 心率
         CASE
@@ -48,15 +47,14 @@ WITH vital_signs AS (
             AND nursingchartvalue NOT IN ('-','.')
             THEN CAST(nursingchartvalue AS numeric)
         ELSE NULL END AS temperature
-    FROM eicu_crd.trauma_patients tp
-    JOIN eicu_crd.patient p ON tp.uniquepid = p.uniquepid
-    JOIN eicu_crd.nursecharting n ON p.patientunitstayid = n.patientunitstayid
+    FROM public.trauma_patients p
+    JOIN eicu.nursecharting n ON p.patientunitstayid = n.patientunitstayid
     WHERE n.nursingchartcelltypecat = 'Vital Signs'
     AND n.nursingchartoffset >= 0 
     AND n.nursingchartoffset <= 480 -- 8小时
 )
 SELECT 
-    uniquepid,
+    patientunitstayid,
     -- 0-1小时
     AVG(CASE WHEN nursingchartoffset BETWEEN 0 AND 60 THEN heartrate END) as hr_0_1,
     AVG(CASE WHEN nursingchartoffset BETWEEN 0 AND 60 THEN o2saturation END) as spo2_0_1,
@@ -111,4 +109,4 @@ WHERE heartrate IS NOT NULL
    OR o2saturation IS NOT NULL
    OR mean_bp IS NOT NULL
    OR temperature IS NOT NULL
-GROUP BY uniquepid;
+GROUP BY patientunitstayid;
