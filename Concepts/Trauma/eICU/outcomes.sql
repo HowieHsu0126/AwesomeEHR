@@ -1,15 +1,9 @@
-DROP TABLE IF EXISTS eicu_crd.trauma_outcomes;
+DROP TABLE IF EXISTS public.trauma_outcomes;
 -- 创建trauma患者预后表（每个患者唯一记录）
-CREATE TABLE eicu_crd.trauma_outcomes AS
-WITH last_stay AS (
-    SELECT 
-        uniquepid,
-        MAX(patientunitstayid) as last_patientunitstayid
-    FROM eicu_crd.patient
-    GROUP BY uniquepid
-)
+CREATE TABLE public.trauma_outcomes AS
+
 SELECT 
-    t.uniquepid,
+    t.patientunitstayid,
     -- ICU内死亡
     CASE 
         WHEN p.unitdischargestatus = 'Expired' THEN 1
@@ -20,8 +14,6 @@ SELECT
         WHEN p.hospitaldischargestatus = 'Expired' THEN 1
         ELSE 0
     END AS hospital_mortality
-FROM eicu_crd.trauma_patients t
-LEFT JOIN last_stay ls 
-    ON t.uniquepid = ls.uniquepid
-LEFT JOIN eicu_crd.patient p 
-    ON ls.last_patientunitstayid = p.patientunitstayid;
+FROM public.trauma_patients t
+LEFT JOIN eicu.patient p 
+    ON t.patientunitstayid = p.patientunitstayid;
