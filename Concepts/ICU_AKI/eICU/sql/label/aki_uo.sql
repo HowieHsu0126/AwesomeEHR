@@ -21,14 +21,23 @@ WITH weight_data AS (
         uo.chartoffset,
         uo.urineoutput,
         wd.avg_weight,
-        wd.unitdischargeoffset,  -- 添加出院时间偏移量
-        (uo.urineoutput / (6 * wd.avg_weight)) AS urine_output_ml_per_kg_per_hr  -- 计算每小时每公斤体重的尿量
+        wd.unitdischargeoffset,
+        -- 计算相邻两次测量之间的时间间隔（小时）
+        NULLIF((uo.chartoffset - LAG(uo.chartoffset) 
+            OVER (PARTITION BY uo.patientunitstayid ORDER BY uo.chartoffset)), 0) / 60.0 as hours_since_last_measurement,
+        -- 使用实际时间间隔计算每小时每公斤体重的尿量
+        CASE 
+            WHEN LAG(uo.chartoffset) OVER (PARTITION BY uo.patientunitstayid ORDER BY uo.chartoffset) IS NULL 
+            THEN NULL  -- 第一条记录无法计算时间间隔，返回NULL
+            ELSE (uo.urineoutput / NULLIF((uo.chartoffset - LAG(uo.chartoffset) 
+                OVER (PARTITION BY uo.patientunitstayid ORDER BY uo.chartoffset)), 0) * 60.0 / wd.avg_weight)
+        END AS urine_output_ml_per_kg_per_hr
     FROM
         pivoted_uo uo
     INNER JOIN weight_data wd ON uo.patientunitstayid = wd.patientunitstayid
     WHERE 
-        uo.chartoffset >= 0  -- 确保时间在入ICU之后
-        AND uo.chartoffset <= wd.unitdischargeoffset  -- 确保时间在出ICU之前
+        uo.chartoffset >= 0
+        AND uo.chartoffset <= wd.unitdischargeoffset
 ), aki_criteria AS (
     SELECT
         uph.patientunitstayid,
