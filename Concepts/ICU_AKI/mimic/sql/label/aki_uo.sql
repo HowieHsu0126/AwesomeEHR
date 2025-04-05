@@ -25,92 +25,100 @@ DROP TABLE IF EXISTS aki_uo;
 
 -- 创建新的结果表
 CREATE TABLE aki_uo AS
-WITH uo_stg1 AS (
-    SELECT
-        ie.stay_id,
-        uo.charttime,
-        ie.subject_id,
-        DATETIME_DIFF(charttime, intime, 'SECOND') AS seconds_since_admit,
-        COALESCE(DATETIME_DIFF(charttime, LAG(charttime) OVER (PARTITION BY ie.stay_id ORDER BY charttime), 'SECOND') / 3600.0, 1) AS hours_since_previous_row,
-        urineoutput
-    FROM
-        mimiciv_icu.icustays ie
-        INNER JOIN mimiciv_derived.urine_output uo ON ie.stay_id = uo.stay_id
-),
-weight_avg AS (
+WITH weight_data AS (
     -- 计算每个患者的平均体重
     SELECT
-        stay_id,
-        AVG(weight) AS avg_weight
+        s.stay_id,
+        AVG(s.weight) AS avg_weight,
+        ie.subject_id,
+        ie.intime,
+        ie.outtime
     FROM
-        mimiciv_derived.weight_durations
+        mimiciv_derived.weight_durations s
+    JOIN
+        mimiciv_icu.icustays ie ON s.stay_id = ie.stay_id
     GROUP BY
-        stay_id
+        s.stay_id, ie.subject_id, ie.intime, ie.outtime
 ),
-uo_stg2 AS (
-    SELECT
-        stay_id,
-        charttime,
-        subject_id,
-        hours_since_previous_row,
-        urineoutput,
-        SUM(urineoutput) OVER (PARTITION BY stay_id ORDER BY seconds_since_admit RANGE BETWEEN 21600 PRECEDING AND CURRENT ROW) AS urineoutput_6hr,
-        SUM(hours_since_previous_row) OVER (PARTITION BY stay_id ORDER BY seconds_since_admit RANGE BETWEEN 21600 PRECEDING AND CURRENT ROW) AS uo_tm_6hr
-    FROM
-        uo_stg1
+ur_stg AS (
+    SELECT 
+        io.stay_id, 
+        io.charttime,
+        -- 6 hours
+        SUM(CASE WHEN iosum.charttime >= DATETIME_SUB(io.charttime, interval '5' hour)
+            THEN iosum.urineoutput
+            ELSE NULL END) AS UrineOutput_6hr,
+        -- calculate the number of hours over which we've tabulated UO
+        ROUND(CAST(
+            DATETIME_DIFF(io.charttime, 
+                -- below MIN() gets the earliest time that was used in the summation 
+                MIN(CASE WHEN iosum.charttime >= DATETIME_SUB(io.charttime, interval '5' hour)
+                    THEN iosum.charttime
+                    ELSE NULL END),
+                'SECOND') AS NUMERIC)/3600.0, 4) AS uo_tm_6hr
+    FROM 
+        mimiciv_derived.urine_output io
+    -- this join gives all UO measurements over the 24 hours preceding this row
+    LEFT JOIN mimiciv_derived.urine_output iosum
+        ON io.stay_id = iosum.stay_id
+        AND iosum.charttime <= io.charttime
+        AND iosum.charttime >= DATETIME_SUB(io.charttime, interval '5' hour)
+    GROUP BY 
+        io.stay_id, io.charttime
 ),
-uo_aki AS (
-    -- 基于 KDIGO 标准判断 AKI 状态
+aki_ur AS (
     SELECT
-        ur.subject_id,
         ur.stay_id,
         ur.charttime,
-        wa.avg_weight,
+        wd.avg_weight,
         ur.urineoutput_6hr,
-        ur.uo_tm_6hr,
-        ROUND(CAST((ur.urineoutput_6hr / wa.avg_weight / ur.uo_tm_6hr) AS numeric), 4) AS uo_rt_6hr,
-        CASE WHEN ur.uo_tm_6hr >= 6
-            AND (ur.urineoutput_6hr / wa.avg_weight / ur.uo_tm_6hr) < 0.5 THEN
-            'AKI-UO'
-        ELSE
-            'No AKI'
-        END AS aki_status,
-        -- 记录 AKI 发生的最早时间点
-        MIN(charttime) OVER (PARTITION BY ur.stay_id ORDER BY ur.charttime RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS aki_timepoint
-    FROM
-        uo_stg2 ur
-        LEFT JOIN weight_avg wa ON ur.stay_id = wa.stay_id
-    WHERE
-        ur.uo_tm_6hr >= 6
-        AND (ur.urineoutput_6hr / wa.avg_weight / ur.uo_tm_6hr) < 0.5
+        -- calculate rates - adding 1 hour as we assume data charted at 10:00 corresponds to previous hour
+        ROUND(CAST((ur.UrineOutput_6hr/wd.avg_weight/(uo_tm_6hr+1)) AS NUMERIC), 4) AS uo_rt_6hr,
+        -- number of hours between current UO time and earliest charted UO within the X hour window
+        uo_tm_6hr
+    FROM 
+        ur_stg ur
+    LEFT JOIN weight_data wd
+        ON ur.stay_id = wd.stay_id
+        AND ur.charttime >= wd.intime
+        AND ur.charttime < wd.outtime
 ),
--- 选择每位患者的最早 AKI 判断，并确保 AKI 发生在 ICU 期间
+aki_final AS (
+    SELECT
+        uo.stay_id,
+        ie.subject_id,
+        uo.charttime,
+        uo.avg_weight,
+        uo.uo_rt_6hr,
+        -- AKI stages according to urine output
+        CASE
+            WHEN uo.uo_rt_6hr IS NULL THEN NULL
+            -- require patient to be in ICU for at least 6 hours to stage UO
+            WHEN uo.charttime <= DATETIME_ADD(ie.intime, INTERVAL '6' HOUR) THEN 0
+            -- require the UO rate to be calculated over half the period
+            WHEN uo.uo_tm_6hr >= 3 AND uo.uo_rt_6hr < 0.5 THEN 1
+            ELSE 0 
+        END AS aki_stage_uo
+    FROM 
+        aki_ur uo
+    INNER JOIN mimiciv_icu.icustays ie
+        ON uo.stay_id = ie.stay_id
+),
 earliest_aki AS (
     SELECT
-        ua.subject_id,
-        ua.stay_id,
-        ua.aki_status,
-        ua.aki_timepoint,
-        icu.icu_intime,
-        icu.icu_outtime,
-        ROW_NUMBER() OVER (PARTITION BY ua.subject_id ORDER BY ua.aki_timepoint ASC) AS row_num
-    FROM
-        uo_aki ua
-    LEFT JOIN mimiciv_zone_js.icustay_detail icu 
-        ON ua.subject_id = icu.subject_id 
-        AND ua.stay_id = icu.stay_id
-    WHERE ua.aki_timepoint BETWEEN icu.icu_intime AND icu.icu_outtime  -- 添加 ICU 时间约束
+        subject_id,
+        stay_id,
+        charttime AS aki_timepoint,
+        ROW_NUMBER() OVER (PARTITION BY subject_id ORDER BY charttime) AS rn
+    FROM aki_final
+    WHERE aki_stage_uo = 1
 )
 SELECT
     subject_id,
     stay_id,
-    aki_status,
-    aki_timepoint AS charttime
-FROM
-    earliest_aki
-WHERE
-    row_num = 1
-ORDER BY subject_id;
+    aki_timepoint
+FROM earliest_aki
+WHERE rn = 1;
 
 -- 主要内容：基于KDIGO尿量标准判断AKI，
 -- 计算6小时内的尿量输出率（ml/kg/h），当低于0.5时判定为AKI，

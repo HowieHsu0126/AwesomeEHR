@@ -17,111 +17,85 @@ WITH weight_data AS (
     GROUP BY
         p.patientunitstayid, p.uniquepid, p.unitdischargeoffset
 ), urine_output_stg1 AS (
-    -- 计算相邻两次尿量测量之间的时间间隔
-    -- 用于后续计算6小时窗口内的尿量输出率
+    -- 计算5小时窗口内的尿量统计
     SELECT
-        uo.patientunitstayid,
-        uo.chartoffset,
-        uo.urineoutput,
+        io.patientunitstayid,
+        io.chartoffset,
+        -- 计算5小时窗口内的总尿量
+        SUM(CASE WHEN iosum.chartoffset >= io.chartoffset - 300  -- 300分钟 = 5小时
+            THEN iosum.urineoutput
+            ELSE NULL END) AS UrineOutput_6hr,
+        -- 计算实际计算时间（小时）
+        ROUND(CAST(
+            (io.chartoffset - 
+                MIN(CASE WHEN iosum.chartoffset >= io.chartoffset - 300
+                    THEN iosum.chartoffset
+                    ELSE NULL END)) / 60.0 AS NUMERIC), 4) AS uo_tm_6hr
+    FROM
+        pivoted_uo io
+    LEFT JOIN pivoted_uo iosum
+        ON io.patientunitstayid = iosum.patientunitstayid
+        AND iosum.chartoffset <= io.chartoffset
+        AND iosum.chartoffset >= io.chartoffset - 300
+    GROUP BY
+        io.patientunitstayid, io.chartoffset
+), aki_ur AS (
+    SELECT
+        ur.patientunitstayid,
+        ur.chartoffset,
         wd.avg_weight,
-        wd.unitdischargeoffset,
-        -- 计算相邻两次测量之间的时间间隔（小时）
-        NULLIF((uo.chartoffset - LAG(uo.chartoffset) 
-            OVER (PARTITION BY uo.patientunitstayid ORDER BY uo.chartoffset)), 0) / 60.0 as hours_since_last_measurement
+        ur.urineoutput_6hr,
+        -- calculate rates - adding 1 hour as we assume data charted at 10:00 corresponds to previous hour
+        ROUND(CAST((ur.UrineOutput_6hr/wd.avg_weight/(uo_tm_6hr+1)) AS NUMERIC), 4) AS uo_rt_6hr,
+        -- number of hours between current UO time and earliest charted UO within the X hour window
+        uo_tm_6hr
     FROM
-        pivoted_uo uo
-    INNER JOIN weight_data wd ON uo.patientunitstayid = wd.patientunitstayid
-    WHERE 
-        uo.chartoffset >= 0
-        AND uo.chartoffset <= wd.unitdischargeoffset
-), urine_output_stg2 AS (
-    -- 计算6小时窗口内的尿量统计
-    -- 使用滑动窗口计算6小时内的总尿量和总时间
-    SELECT
-        patientunitstayid,
-        chartoffset,
-        urineoutput,
-        avg_weight,
-        unitdischargeoffset,
-        -- 计算6小时窗口内的总尿量（360分钟 = 6小时）
-        SUM(urineoutput) OVER (
-            PARTITION BY patientunitstayid 
-            ORDER BY chartoffset 
-            RANGE BETWEEN 360 PRECEDING AND CURRENT ROW
-        ) AS urineoutput_6hr,
-        -- 计算6小时窗口内的总时间
-        SUM(hours_since_last_measurement) OVER (
-            PARTITION BY patientunitstayid 
-            ORDER BY chartoffset 
-            RANGE BETWEEN 360 PRECEDING AND CURRENT ROW
-        ) AS uo_tm_6hr
-    FROM
-        urine_output_stg1
-), aki_criteria AS (
-    -- 根据KDIGO标准判断AKI
-    -- 当6小时窗口内尿量<0.5ml/kg/h时判定为AKI
+        urine_output_stg1 ur
+    LEFT JOIN weight_data wd
+        ON ur.patientunitstayid = wd.patientunitstayid
+        AND ur.chartoffset >= 0
+        AND ur.chartoffset <= wd.unitdischargeoffset
+), aki_final AS (
     SELECT
         uo.patientunitstayid,
-        uo.chartoffset,
-        uo.unitdischargeoffset,
-        uo.avg_weight,
-        uo.urineoutput_6hr,
-        uo.uo_tm_6hr,
-        -- 计算6小时窗口内的尿量输出率（ml/kg/h）
-        -- 只有当时间窗口>=6小时时才计算
-        CASE 
-            WHEN uo.uo_tm_6hr >= 6 THEN
-                (uo.urineoutput_6hr / uo.avg_weight / uo.uo_tm_6hr)
-            ELSE NULL
-        END AS urine_output_ml_per_kg_per_hr,
-        -- 根据KDIGO标准判断AKI状态
-        CASE
-            WHEN uo.uo_tm_6hr >= 6 
-                AND (uo.urineoutput_6hr / uo.avg_weight / uo.uo_tm_6hr) < 0.5 
-            THEN 'AKI'
-            ELSE 'Non-AKI'
-        END AS aki_status
-    FROM
-        urine_output_stg2 uo
-), earliest_aki_record AS (
-    -- 为每个患者选择最早的AKI记录
-    -- 使用uniquepid作为患者唯一标识
-    SELECT
-        ac.patientunitstayid,
         p.uniquepid,
-        ac.chartoffset,
-        ac.urineoutput_6hr,
-        ac.avg_weight,
-        ac.urine_output_ml_per_kg_per_hr,
-        ac.aki_status,
-        ac.unitdischargeoffset,
-        -- 按uniquepid分组，选择最早的记录
-        ROW_NUMBER() OVER (PARTITION BY p.uniquepid ORDER BY ac.chartoffset ASC) AS row_num
+        uo.chartoffset,
+        uo.avg_weight,
+        uo.uo_rt_6hr,
+        -- AKI stages according to urine output
+        CASE
+            WHEN uo.uo_rt_6hr IS NULL THEN NULL
+            -- require patient to be in ICU for at least 6 hours to stage UO
+            WHEN uo.chartoffset <= 360 THEN 0  -- 360分钟 = 6小时
+            -- require the UO rate to be calculated over half the period
+            WHEN uo.uo_tm_6hr >= 3 AND uo.uo_rt_6hr < 0.5 THEN 1
+            ELSE 0
+        END AS aki_stage_uo
     FROM
-        aki_criteria ac
-    JOIN
-        eicu_crd.patient p ON ac.patientunitstayid = p.patientunitstayid
+        aki_ur uo
+    INNER JOIN eicu_crd.patient p
+        ON uo.patientunitstayid = p.patientunitstayid
+), ranked_aki AS (
+    SELECT
+        uniquepid,
+        patientunitstayid,
+        chartoffset AS aki_timepoint,
+        ROW_NUMBER() OVER (PARTITION BY uniquepid ORDER BY chartoffset) AS rn
+    FROM
+        aki_final
     WHERE
-        ac.aki_status = 'AKI'
+        aki_stage_uo = 1
 )
-
--- 最终结果：每个患者的最早AKI记录
 SELECT
     uniquepid,
     patientunitstayid,
-    chartoffset,
-    urineoutput_6hr,
-    avg_weight,
-    urine_output_ml_per_kg_per_hr,
-    aki_status
+    aki_timepoint AS chartoffset
 FROM
-    earliest_aki_record
+    ranked_aki
 WHERE
-    row_num = 1  -- 选择每个患者的第一条记录
-    AND chartoffset >= 0  -- 确保在入ICU后
-    AND chartoffset <= unitdischargeoffset  -- 确保在出ICU前
+    rn = 1
 ORDER BY
     uniquepid;
 
--- 主要内容：基于尿量判断AKI，使用6小时窗口计算尿量输出率，
--- 当时间>=6小时且尿量<0.5ml/kg/h时判定为AKI
+-- 主要内容：基于尿量判断AKI，使用5小时窗口计算尿量输出率，
+-- 当时间>=3小时且尿量<0.5ml/kg/h时判定为AKI

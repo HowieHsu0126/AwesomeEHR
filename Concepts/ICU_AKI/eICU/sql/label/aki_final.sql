@@ -12,15 +12,15 @@ WITH combined AS (
         -- 来自 aki_cr 表的判断（48小时与7天各自独立判断）
         CASE WHEN ac.aki_diagnosis_48hrs = 1 THEN TRUE ELSE FALSE END AS aki_cr_48h,
         CASE WHEN ac.aki_diagnosis_7days = 1 THEN TRUE ELSE FALSE END AS aki_cr_7d,
-        -- 来自 aki_uo 表的判断
-        CASE WHEN uo.aki_status = 'AKI' THEN TRUE ELSE FALSE END AS aki_uo
+        -- 来自 aki_uo 表的判断（所有患者均为AKI）
+        TRUE AS aki_uo
     FROM aki_cr ac
     FULL OUTER JOIN aki_uo uo
          ON ac.patientunitstayid = uo.patientunitstayid
     JOIN eicu_crd.patient p ON COALESCE(ac.patientunitstayid, uo.patientunitstayid) = p.patientunitstayid  -- 连接 patient 表获取 uniquepid
     WHERE (ac.aki_diagnosis_48hrs = 1 
            OR ac.aki_diagnosis_7days = 1
-           OR uo.aki_status = 'AKI')
+           OR uo.patientunitstayid IS NOT NULL)  -- 修改为检查 uo 表中是否存在记录
 ),
 earliest_aki_record AS (
     SELECT
