@@ -1,5 +1,9 @@
 # AwesomeEHR 🏥
 
+<div align="center">
+  <img src="docs/images/project_background.png" alt="AwesomeEHR Project Background" width="100%">
+</div>
+
 ## Overview
 AwesomeEHR is a sophisticated SQL-based framework designed for comprehensive analysis of Electronic Health Records (EHR) data. This project focuses on the analysis and prediction of critical medical conditions, particularly:
 
