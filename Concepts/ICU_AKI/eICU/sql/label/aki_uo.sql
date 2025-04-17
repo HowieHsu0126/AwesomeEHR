@@ -68,7 +68,7 @@ WITH weight_data AS (
             -- require patient to be in ICU for at least 6 hours to stage UO
             WHEN uo.chartoffset <= 360 THEN 0  -- 360分钟 = 6小时
             -- require the UO rate to be calculated over half the period
-            WHEN uo.uo_tm_6hr >= 3 AND uo.uo_rt_6hr < 0.5 THEN 1
+            WHEN uo.uo_tm_6hr >= 2 AND uo.uo_rt_6hr < 0.5 THEN 1
             ELSE 0
         END AS aki_stage_uo
     FROM

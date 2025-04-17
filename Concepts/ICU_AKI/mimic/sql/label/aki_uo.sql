@@ -96,7 +96,7 @@ aki_final AS (
             -- require patient to be in ICU for at least 6 hours to stage UO
             WHEN uo.charttime <= DATETIME_ADD(ie.intime, INTERVAL '6' HOUR) THEN 0
             -- require the UO rate to be calculated over half the period
-            WHEN uo.uo_tm_6hr >= 3 AND uo.uo_rt_6hr < 0.5 THEN 1
+            WHEN uo.uo_tm_6hr >= 2 AND uo.uo_rt_6hr < 0.5 THEN 1
             ELSE 0 
         END AS aki_stage_uo
     FROM 
