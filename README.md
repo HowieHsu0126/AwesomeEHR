@@ -98,3 +98,11 @@ The software is provided "as is" without warranty of any kind. Users are respons
 ## Contact 📧
 For inquiries and contributions, please contact:
 - Email: haoweixu0126@163.com
+
+## Acknowledgments 🙏
+This project is inspired by and builds upon the excellent work of the MIT Laboratory for Computational Physiology (MIT-LCP) team. We would like to acknowledge and thank the following repositories for their valuable contributions to the medical informatics community:
+
+- [eICU Collaborative Research Database Code Repository](https://github.com/MIT-LCP/eicu-code)
+- [MIMIC-IV Code Repository](https://github.com/MIT-LCP/mimic-iv/tree/master)
+
+Their pioneering work in creating standardized SQL queries for EHR data analysis has been instrumental in advancing medical informatics research.
