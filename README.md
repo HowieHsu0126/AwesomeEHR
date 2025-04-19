@@ -16,44 +16,10 @@ We provide standardized PostgreSQL queries and functions to extract, transform, 
 ```
 .
 ├── Timeseries/              # Time-series data analysis queries 📈
-│   ├── Acidosis.sql        # Acidosis monitoring and analysis
-│   ├── Chole.sql           # Cholecystitis-related analysis
-│   ├── CNSDys.sql          # CNS dysfunction analysis
-│   ├── Coag.sql            # Coagulation disorders analysis
-│   ├── HepatoDys.sql       # Hepatic dysfunction analysis
-│   ├── HypCarb.sql         # Hypocarbia analysis
-│   ├── HypGly.sql          # Hypoglycemia analysis
-│   ├── LeukDys.sql         # Leukocyte dysfunction analysis
-│   ├── LyteImbal.sql       # Electrolyte imbalance analysis
-│   ├── MalNut.sql          # Malnutrition analysis
-│   ├── MyoIsch.sql         # Myocardial ischemia analysis
-│   ├── O2DiffDys.sql       # Oxygen diffusion disorders
-│   ├── O2TxpDef.sql        # Oxygen transport deficiency
-│   ├── RenDys.sql          # Renal dysfunction analysis
-│   ├── Tachy.sql           # Tachycardia analysis
-│   ├── ThermoDys.sql       # Thermoregulatory disorders
-│   └── UrineOutput.sql     # Urine output analysis
-│
 ├── Concepts/               # Clinical concept definitions 📚
-│   ├── VitalSigns/        # Vital signs concept definitions
-│   ├── LabResults/        # Laboratory result concepts
-│   └── ClinicalEvents/    # Clinical event definitions
-│
 ├── Medication/            # Medication-related queries 💊
-│   ├── Antibiotics/       # Antibiotic administration analysis
-│   ├── Vasopressors/      # Vasopressor usage analysis
-│   └── Sedatives/         # Sedative medication analysis
-│
 ├── Treatments/            # Treatment protocol queries 🏥
-│   ├── Ventilation/       # Mechanical ventilation protocols
-│   ├── Dialysis/          # Renal replacement therapy
-│   └── Nutrition/         # Nutritional support protocols
-│
 ├── Demographics/          # Patient demographic information 👥
-│   ├── AgeGroups/         # Age-specific analyses
-│   ├── Gender/            # Gender-based analyses
-│   └── Comorbidities/     # Comorbidity analysis
-│
 ├── function.sql          # Core utility functions for data processing ⚙️
 ├── main.sql             # Main execution script coordinating all analyses 🚀
 └── run.sql              # Runtime configuration and environment setup ⚡
