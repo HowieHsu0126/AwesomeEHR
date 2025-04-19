@@ -1,37 +1,16 @@
 # AwesomeEHR 🏥
 
 <div align="center">
-  <img src="docs/images/project_background.png" alt="AwesomeEHR Project Background" width="100%">
+  <img src="docs/images/project_background.png" alt="AwesomeEHR Project Background" width="50%" height="250px">
 </div>
 
+> *Note: This project was initiated during the author's research assistant internship at the **National Institute of Health Data Science (NIHDS) at Peking University**. It aims to foster collaboration and knowledge sharing within the Medical AI community, promoting advancements in healthcare data science and artificial intelligence applications in medicine.* 
+
 ## Overview
-AwesomeEHR is a sophisticated SQL-based framework designed for comprehensive analysis of Electronic Health Records (EHR) data. This project focuses on the analysis and prediction of critical medical conditions, particularly:
 
-- **Metabolic Disorders** 🔬:
-  - Acidosis
-  - Hypoglycemia
-  - Electrolyte imbalances
-  - Malnutrition
+AwesomeEHR is a comprehensive PostgreSQL-based framework designed for extracting and analyzing Electronic Health Records (EHR) data, with a specific focus on common ICU critical conditions: **Acute Kidney Injury (AKI)**, **Sepsis-Associated AKI (SA-AKI)**, **Sepsis** and **Trauma**.
 
-- **Organ System Dysfunction** 💉:
-  - Central Nervous System (CNS) dysfunction
-  - Hepatic dysfunction
-  - Renal dysfunction
-  - Coagulation disorders
-
-- **Respiratory and Cardiovascular Conditions** ❤️:
-  - Oxygen transport deficiency
-  - Myocardial ischemia
-  - Tachycardia
-  - Hypocarbia
-
-- **Other Critical Conditions** ⚕️:
-  - Cholecystitis
-  - Leukocyte dysfunction
-  - Thermoregulatory disorders
-  - Urine output abnormalities
-
-The framework facilitates the extraction, transformation, and analysis of complex medical data across multiple clinical domains, including vital signs, laboratory results, medications, and patient demographics, with a particular focus on early detection and monitoring of these critical conditions.
+We provide standardized PostgreSQL queries and functions to extract, transform, and analyze complex medical data across multiple clinical domains. By offering ready-to-use code templates, it significantly reduces the data processing burden for researchers, allowing them to focus more on clinical insights and research outcomes rather than data wrangling tasks.
 
 ## Project Structure 📁
 ```
@@ -153,6 +132,3 @@ The software is provided "as is" without warranty of any kind. Users are respons
 ## Contact 📧
 For inquiries and contributions, please contact:
 - Email: haoweixu0126@163.com
-
----
-*Note: This project is part of advanced clinical research initiatives at PKU.* 
